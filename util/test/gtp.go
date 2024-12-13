@@ -134,14 +134,14 @@ func DecodeGTPv1Header(pkt []byte) (gtpPdu *GtpPdu, err error) {
 		return nil, err
 	}
 
-	logger.GtpLog.Traceln("Header field - Length:", gtpPdu.Hdr.Len)
-	logger.GtpLog.Traceln("Header field - TEID:", gtpPdu.Hdr.Teid)
+	logger.GtpLog.Debugln("header field - Length:", gtpPdu.Hdr.Len)
+	logger.GtpLog.Debugln("header field - TEID:", gtpPdu.Hdr.Teid)
 
 	payloadStart := GTPU_HEADER_LENGTH
 	payloadEnd := gtpPdu.Hdr.Len + GTPU_HEADER_LENGTH
 
 	if (gtpPdu.Hdr.Flags & FLAG_OPTIONAL) != 0 {
-		logger.GtpLog.Traceln("Optional header present")
+		logger.GtpLog.Debugln("optional header present")
 		gtpPdu.OptHdr = &GtpHdrOpt{}
 		err = binary.Read(buf, binary.BigEndian, gtpPdu.OptHdr)
 		if err != nil {
@@ -221,8 +221,8 @@ func DecodePduSessContainerExtHeader(pkt []uint8) (payload []uint8,
 	return payload, extHdr, nil
 }
 
-func BuildGpduMessage(payload []byte, teID uint32) ([]byte, error) {
-	pduSessContainer := BuildPduSessContainerExtHeader(9)
+func BuildGpduMessage(payload []byte, teID uint32, qfi uint8) ([]byte, error) {
+	pduSessContainer := BuildPduSessContainerExtHeader(qfi)
 
 	/* UE needs to ensure its payload length value should not exceed 2 bytes */
 	payloadLen := uint16(len(payload) + len(pduSessContainer))

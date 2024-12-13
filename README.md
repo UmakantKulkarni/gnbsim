@@ -5,6 +5,7 @@ SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org
 SPDX-License-Identifier: Apache-2.0
 -->
 [![Go Report Card](https://goreportcard.com/badge/github.com/omec-project/gnbsim)](https://goreportcard.com/report/github.com/omec-project/gnbsim)
+![GitHub latest release (SemVer)](https://img.shields.io/github/v/release/omec-project/gnbsim?sort=semver)
 
 # Table Of Contents
 * [Introduction](#Introduction)
@@ -91,6 +92,7 @@ downlink user data (ICMP echo response) over the established data plane path
 - UI Support
 - 3gpp Release Upgrade
 - Extensive gnbsim documentation
+- Command line options to send logs and/or events to file in specific format for post processing.
 
 # Support and Contributions
 
@@ -98,7 +100,7 @@ The gnbsim project welcomes new contributors. Feel free to propose a new feature
 
 Before contributing, please follow these guidelines:
 
-1. gNBSim documentation details [here](./docs/README.md)
+1. gNBSim documentation details [here](./docs/)
 2. Please refer to the official [SD-Core documentation](https://docs.sd-core.opennetworking.org/master/developer/gnbsim.html#gnb-simulator) for more details.
 3. #sdcore-dev channel in [ONF Community Slack](https://onf-community.slack.com/)
 4. Raise Github issues

@@ -4,9 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-FROM golang:1.22.4-bookworm AS builder
-
-LABEL maintainer="Aether SD-Core <dev@aetherproject.org>"
+FROM golang:1.23.4-bookworm AS builder
 
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
@@ -18,9 +16,10 @@ WORKDIR $GOPATH/src/gnbsim
 COPY . .
 RUN make all
 
-FROM alpine:3.20 AS gnbsim
+FROM alpine:3.21 AS gnbsim
 
-LABEL description="Aether open source 5G Core Network" \
+LABEL maintainer="Aether SD-Core <dev@lists.aetherproject.org>" \
+    description="Aether open source 5G Core Network" \
     version="Stage 3"
 
 ARG DEBUG_TOOLS
@@ -32,7 +31,7 @@ RUN if [ "$DEBUG_TOOLS" = "true" ]; then \
         apk update && apk add --no-cache -U gcompat vim strace net-tools curl netcat-openbsd bind-tools; \
         fi
 
-WORKDIR /gnbsim/bin
+WORKDIR /gnbsim
 
 # Copy executable
-COPY --from=builder /go/src/gnbsim/bin .
+COPY --from=builder /go/src/gnbsim/bin /usr/local/bin/.

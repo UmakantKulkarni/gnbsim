@@ -12,6 +12,7 @@ import (
 	_ "net/http/pprof" // Using package only for invoking initialization.
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -24,34 +25,36 @@ import (
 	prof "github.com/omec-project/gnbsim/profile"
 	profctx "github.com/omec-project/gnbsim/profile/context"
 	"github.com/omec-project/gnbsim/stats"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
+	"go.uber.org/zap/zapcore"
 )
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "GNBSIM"
-	app.Usage = "./gnbsim --cfg [gnbsim configuration file]"
+	app.Usage = "gnbsim --cfg <gnbsim_config_file.yaml>"
 	app.Action = action
 	app.Flags = getCliFlags()
 
-	logger.AppLog.Infoln("App Name:", app.Name)
+	logger.AppLog.Infoln("app name:", app.Name)
 
 	if err := app.Run(os.Args); err != nil {
-		logger.AppLog.Errorln("Failed to run GNBSIM:", err)
+		logger.AppLog.Errorln("failed to run GNBSIM:", err)
 		return
 	}
 }
 
 func action(c *cli.Context) error {
 	cfg := c.String("cfg")
-	if cfg == "" {
-		logger.AppLog.Warnln("No configuration file provided. Using default configuration file:", factory.GNBSIM_DEFAULT_CONFIG_PATH)
-		logger.AppLog.Infoln("Application Usage:", c.App.Usage)
-		cfg = factory.GNBSIM_DEFAULT_CONFIG_PATH
+
+	absPath, err := filepath.Abs(cfg)
+	if err != nil {
+		logger.AppLog.Errorln(err)
+		return err
 	}
 
-	if err := factory.InitConfigFactory(cfg); err != nil {
-		logger.AppLog.Errorln("Failed to initialize config factory:", err)
+	if err = factory.InitConfigFactory(absPath); err != nil {
+		logger.AppLog.Errorln("failed to initialize config factory:", err)
 		return err
 	}
 
@@ -61,26 +64,29 @@ func action(c *cli.Context) error {
 	if config.Configuration.GoProfile.Enable {
 		go func() {
 			endpt := fmt.Sprintf(":%v", config.Configuration.GoProfile.Port)
-			fmt.Println("endpoint for profile server ", endpt)
-			err := http.ListenAndServe(endpt, nil)
+			logger.AppLog.Infoln("endpoint for profile server", endpt)
+			err = http.ListenAndServe(endpt, nil)
 			if err != nil {
-				logger.AppLog.Errorln("Failed to start profiling server")
+				logger.AppLog.Errorln("failed to start profiling server")
 			}
 		}()
 	}
-	lvl := config.Logger.LogLevel
-	logger.AppLog.Infoln("Setting log level to:", lvl)
+	lvl, errLevel := zapcore.ParseLevel(config.Logger.LogLevel)
+	if errLevel != nil {
+		logger.AppLog.Errorln("can not parse input level")
+	}
+	logger.AppLog.Infoln("setting log level to:", lvl)
 	logger.SetLogLevel(lvl)
 
-	err := prof.InitializeAllProfiles()
+	err = prof.InitializeAllProfiles()
 	if err != nil {
-		logger.AppLog.Errorln("Failed to initialize Profiles:", err)
+		logger.AppLog.Errorln("failed to initialize Profiles:", err)
 		return err
 	}
 
 	err = gnodeb.InitializeAllGnbs()
 	if err != nil {
-		logger.AppLog.Errorln("Failed to initialize gNodeBs:", err)
+		logger.AppLog.Errorln("failed to initialize gNodeBs:", err)
 		return err
 	}
 
@@ -152,14 +158,15 @@ func action(c *cli.Context) error {
 
 func getCliFlags() []cli.Flag {
 	return []cli.Flag{
-		cli.StringFlag{
-			Name:  "cfg",
-			Usage: "GNBSIM config file",
+		&cli.StringFlag{
+			Name:     "cfg",
+			Usage:    "gNBSim config file",
+			Required: true,
 		},
 	}
 }
 
-// TODO : we don't keep track of how many profiles are started...
+// TODO: we don't keep track of how many profiles are started...
 func ListenAndLogSummary() {
 	for intfcMsg := range profctx.SummaryChan {
 		// TODO: do we need this event ?
@@ -171,11 +178,11 @@ func ListenAndLogSummary() {
 		// Waiting for execution summary from profile routine
 		msg, ok := intfcMsg.(*common.SummaryMessage)
 		if !ok {
-			logger.AppLog.Fatalln("Invalid Message Type")
+			logger.AppLog.Fatalln("invalid Message Type")
 		}
 
-		logger.AppSummaryLog.Infoln("Profile Name:", msg.ProfileName, ", Profile Type:", msg.ProfileType)
-		logger.AppSummaryLog.Infoln("Ue's Passed:", msg.UePassedCount, ", Ue's Failed:", msg.UeFailedCount)
+		logger.AppSummaryLog.Infof("Profile Name: %v, Profile Type: %v", msg.ProfileName, msg.ProfileType)
+		logger.AppSummaryLog.Infof("Ue's Passed: %v, Ue's Failed: %v", msg.UePassedCount, msg.UeFailedCount)
 
 		if len(msg.ErrorList) != 0 {
 			result = "FAIL"

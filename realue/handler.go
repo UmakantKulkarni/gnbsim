@@ -67,7 +67,16 @@ func HandleAuthResponseEvent(ue *realuectx.RealUe,
 	stats.LogStats(e)
 	msg.Id = id
 
-	// First process the corresponding Auth Request
+	// First process the corresponding Auth Request if present
+	if msg.NasMsg == nil || msg.NasMsg.AuthenticationRequest == nil {
+		ue.Log.Infoln("no Authentication Request; sending empty Authentication Response")
+		nasPdu := nasTestpacket.GetAuthenticationResponse([]byte{}, "")
+		m := formUuMessage(common.AUTH_RESPONSE_EVENT, nasPdu, id)
+		SendToSimUe(ue, m)
+		ue.Log.Debugln("sent Authentication Response Message to SimUe")
+		return nil
+	}
+
 	ue.Log.Debugln("processing corresponding Authentication Request Message")
 	authReq := msg.NasMsg.AuthenticationRequest
 
@@ -471,12 +480,13 @@ func HandleServiceRequestEvent(ue *realuectx.RealUe,
 
 	m := formUuMessage(common.SERVICE_REQUEST_EVENT, nasPdu, id)
 	var tmsi string
-	if len(ue.Guti) == 19 {
-		tmsi = ue.Guti[5:]
-	} else {
-		tmsi = ue.Guti[6:]
+	if len(ue.Guti) >= 10 {
+		if len(ue.Guti) == 19 {
+			tmsi = ue.Guti[5:]
+		} else {
+			tmsi = ue.Guti[6:]
+		}
 	}
-
 	m.Tmsi = tmsi
 	SendToSimUe(ue, m)
 	return nil

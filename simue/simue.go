@@ -79,6 +79,8 @@ func HandleEvents(ue *simuectx.SimUe) {
 			err = HandleAuthRequestEvent(ue, msg)
 		case common.AUTH_RESPONSE_EVENT:
 			err = HandleAuthResponseEvent(ue, msg)
+		case common.AUTH_REJECT_EVENT:
+			err = HandleAuthRejectEvent(ue, msg)
 		case common.SEC_MOD_COMMAND_EVENT:
 			err = HandleSecModCommandEvent(ue, msg)
 		case common.SEC_MOD_COMPLETE_EVENT:
@@ -119,6 +121,8 @@ func HandleEvents(ue *simuectx.SimUe) {
 			err = HandleServiceRequestEvent(ue, msg)
 		case common.SERVICE_ACCEPT_EVENT:
 			err = HandleServiceAcceptEvent(ue, msg)
+		case common.SERVICE_REJECT_EVENT:
+			err = HandleServiceRejectEvent(ue, msg)
 		case common.CONNECTION_RELEASE_REQUEST_EVENT:
 			err = HandleConnectionReleaseRequestEvent(ue, msg)
 		case common.DEREG_REQUEST_UE_TERM_EVENT:

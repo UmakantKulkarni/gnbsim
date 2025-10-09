@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/omec-project/gnbsim/anomaly"
 	"github.com/omec-project/gnbsim/common"
 	simuectx "github.com/omec-project/gnbsim/simue/context"
 	"github.com/omec-project/gnbsim/stats"
@@ -47,6 +48,17 @@ func HandleAuthRequestEvent(ue *simuectx.SimUe,
 	intfMsg common.InterfaceMessage,
 ) (err error) {
 	msg := intfMsg.(*common.UeMessage)
+	// Anomaly procedures like duplicate-registration may receive an
+	// Authentication Request without the event map being configured. Skip
+	// validation and directly ask the RealUe to craft a response.
+	if ue.Procedure == common.ANOMALY_PROCEDURE {
+		e := &stats.StatisticsEvent{Supi: ue.Supi, EType: stats.AUTH_REQ_IN, Id: msg.Id}
+		stats.LogStats(e)
+		msg.Event = common.AUTH_RESPONSE_EVENT
+		SendToRealUe(ue, msg)
+		return nil
+	}
+
 	// checking as per profile if Authentication Request Message is expected
 	// from 5G Core against Registration Request message sent by RealUE
 	err = ue.ProfileCtx.CheckCurrentEvent(ue.Procedure, common.REG_REQUEST_EVENT, msg.Event)
@@ -73,17 +85,53 @@ func HandleAuthResponseEvent(ue *simuectx.SimUe,
 	intfcMsg common.InterfaceMessage,
 ) (err error) {
 	msg := intfcMsg.(*common.UuMessage)
-	// Checking if RealUe has sent expected message as per profile against
-	// Authentication Request message recevied from 5G Core
-	err = ue.ProfileCtx.CheckCurrentEvent(ue.Procedure, common.AUTH_REQUEST_EVENT, msg.Event)
-	if err != nil {
-		ue.Log.Errorln("CheckCurrentEvent returned:", err)
-		return err
+	// For normal registration flows ensure the Authentication Response is
+	// triggered by an Authentication Request.  Anomaly procedures like
+	// auth-response-before-request intentionally skip the request, so the
+	// event map check is skipped for common.ANOMALY_PROCEDURE.
+	if ue.Procedure != common.ANOMALY_PROCEDURE {
+		// Checking if RealUe has sent expected message as per profile against
+		// Authentication Request message recevied from 5G Core
+		err = ue.ProfileCtx.CheckCurrentEvent(ue.Procedure, common.AUTH_REQUEST_EVENT, msg.Event)
+		if err != nil {
+			ue.Log.Errorln("CheckCurrentEvent returned:", err)
+			return err
+		}
 	}
 
 	msg.Event = common.UL_INFO_TRANSFER_EVENT
 	SendToGnbUe(ue, msg)
 	ue.Log.Debugln("sending Authentication Response to the network")
+	return nil
+}
+
+func HandleAuthRejectEvent(ue *simuectx.SimUe,
+	intfcMsg common.InterfaceMessage,
+) (err error) {
+	if ue.Procedure != common.ANOMALY_PROCEDURE {
+		err = ue.ProfileCtx.CheckCurrentEvent(ue.Procedure,
+			common.AUTH_REQUEST_EVENT, intfcMsg.GetEventType())
+		if err != nil {
+			ue.Log.Errorln("CheckCurrentEvent returned:", err)
+			return err
+		}
+		SendToProfile(ue, common.PROC_FAIL_EVENT, fmt.Errorf("authentication rejected"))
+	}
+	return nil
+}
+
+func HandleServiceRejectEvent(ue *simuectx.SimUe,
+	intfcMsg common.InterfaceMessage,
+) (err error) {
+	if ue.Procedure != common.ANOMALY_PROCEDURE {
+		err = ue.ProfileCtx.CheckCurrentEvent(ue.Procedure,
+			common.SERVICE_REQUEST_EVENT, intfcMsg.GetEventType())
+		if err != nil {
+			ue.Log.Errorln("CheckCurrentEvent returned:", err)
+			return err
+		}
+		SendToProfile(ue, common.PROC_FAIL_EVENT, fmt.Errorf("service rejected"))
+	}
 	return nil
 }
 
@@ -93,6 +141,14 @@ func HandleSecModCommandEvent(ue *simuectx.SimUe,
 	// TODO: Should check if SecModCommandEvent event is expected
 
 	msg := intfcMsg.(*common.UeMessage)
+	if ue.Procedure == common.ANOMALY_PROCEDURE {
+		e := &stats.StatisticsEvent{Supi: ue.Supi, EType: stats.SECM_CMD_IN, Id: msg.Id}
+		stats.LogStats(e)
+		msg.Event = common.SEC_MOD_COMPLETE_EVENT
+		SendToRealUe(ue, msg)
+		return nil
+	}
+
 	nextEvent, err := ue.ProfileCtx.GetNextEvent(ue.Procedure, msg.Event)
 	if err != nil {
 		ue.Log.Errorln("GetNextEvent returned:", err)
@@ -113,11 +169,16 @@ func HandleSecModCompleteEvent(ue *simuectx.SimUe,
 	ue.Log.Debugln("handling Security Mode Complete Event")
 
 	msg := intfcMsg.(*common.UuMessage)
-	err = ue.ProfileCtx.CheckCurrentEvent(ue.Procedure, common.SEC_MOD_COMMAND_EVENT,
-		msg.Event)
-	if err != nil {
-		ue.Log.Errorln("CheckCurrentEvent returned:", err)
-		return err
+	// In regular flows Security Mode Complete must follow a Security Mode
+	// Command. Anomaly procedures like security-complete-before-command skip
+	// the command, so bypass event validation for those cases.
+	if ue.Procedure != common.ANOMALY_PROCEDURE {
+		err = ue.ProfileCtx.CheckCurrentEvent(ue.Procedure,
+			common.SEC_MOD_COMMAND_EVENT, msg.Event)
+		if err != nil {
+			ue.Log.Errorln("CheckCurrentEvent returned:", err)
+			return err
+		}
 	}
 
 	msg.Event = common.UL_INFO_TRANSFER_EVENT
@@ -130,6 +191,11 @@ func HandleRegAcceptEvent(ue *simuectx.SimUe,
 	intfcMsg common.InterfaceMessage,
 ) (err error) {
 	msg := intfcMsg.(*common.UeMessage)
+	if ue.Procedure == common.ANOMALY_PROCEDURE {
+		msg.Event = common.REG_COMPLETE_EVENT
+		SendToRealUe(ue, msg)
+		return nil
+	}
 	// TODO: Should check if Registration Accept event is expected
 	nextEvent, err := ue.ProfileCtx.GetNextEvent(ue.Procedure, msg.Event)
 	if err != nil {
@@ -145,10 +211,12 @@ func HandleRegCompleteEvent(ue *simuectx.SimUe,
 	intfcMsg common.InterfaceMessage,
 ) (err error) {
 	msg := intfcMsg.(*common.UuMessage)
-	err = ue.ProfileCtx.CheckCurrentEvent(ue.Procedure, common.REG_ACCEPT_EVENT, msg.Event)
-	if err != nil {
-		ue.Log.Errorln("CheckCurrentEvent returned:", err)
-		return err
+	if ue.Procedure != common.ANOMALY_PROCEDURE {
+		err = ue.ProfileCtx.CheckCurrentEvent(ue.Procedure, common.REG_ACCEPT_EVENT, msg.Event)
+		if err != nil {
+			ue.Log.Errorln("CheckCurrentEvent returned:", err)
+			return err
+		}
 	}
 
 	msg.Event = common.UL_INFO_TRANSFER_EVENT
@@ -156,7 +224,9 @@ func HandleRegCompleteEvent(ue *simuectx.SimUe,
 	ue.Log.Debugln("sent Registration Complete to the network")
 
 	// Current Procedure is complete. Move to next one
-	SendProcedureResult(ue)
+	if ue.Procedure != common.ANOMALY_PROCEDURE {
+		SendProcedureResult(ue)
+	}
 	return nil
 }
 
@@ -530,5 +600,10 @@ func HandleProcedure(ue *simuectx.SimUe) {
 		ue.Log.Infoln("Waiting for N/W Triggered De-registration Procedure")
 	case common.NW_REQUESTED_PDU_SESSION_RELEASE_PROCEDURE:
 		ue.Log.Infoln("Waiting for N/W Requested PDU Session Release Procedure")
+	case common.ANOMALY_PROCEDURE:
+		ue.Log.Infoln("triggering anomaly scenario", ue.ProfileCtx.Anomaly)
+		anomaly.Trigger(ue, ue.ProfileCtx.Anomaly)
+		// mark procedure as finished immediately
+		SendToProfile(ue, common.PROC_PASS_EVENT, nil)
 	}
 }

@@ -1,0 +1,55 @@
+---
+info:
+  version: 1.0.0
+  description: Send Authentication Response before challenge
+configuration:
+  runConfigProfilesAtStart: true
+  singleInterface: false
+  execInParallel: false
+  gnbs:
+    gnb1:
+      n2IpAddr: 10.244.3.34
+      n2Port: 9487
+      n3IpAddr: 10.244.3.34
+      n3Port: 2152
+      name: gnb1
+      globalRanId:
+        plmnId:
+          mcc: 208
+          mnc: 93
+        gNbId:
+          bitLength: 32
+          gNBValue: 00000001
+      supportedTaList:
+        - tac: 000001
+          broadcastPlmnList:
+            - plmnId:
+                mcc: 208
+                mnc: 93
+              taiSliceSupportList:
+                - sst: 1
+      defaultAmf:
+        hostName: open5gs-amf
+        ipAddr: 10.244.2.24
+        port: 38412
+  profiles:
+    - profileType: anomaly
+      profileName: auth-response-before-request
+      enable: true
+      gnbName: gnb1
+      startImsi: 208930000000001
+      ueCount: 1
+      dnn: "internet"
+      sNssai:
+        sst: 1
+        sd: FFFFFF
+      opc: "e8ed289deba952e4283b54e88e6183ca"
+      key: "465b5ce8b199b49faa5f0a2ee238a6bc"
+      sequenceNumber: "16f3b3f70fc2"
+      defaultAs: "1.1.1.1"
+      anomaly: auth-response-before-request
+      plmnId:
+        mcc: 208
+        mnc: 93
+logger:
+  logLevel: debug

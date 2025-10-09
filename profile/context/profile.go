@@ -26,6 +26,7 @@ const (
 	UE_REQ_PDU_SESS_RELEASE string = "uereqpdusessrelease"
 	NW_REQ_PDU_SESS_RELEASE string = "nwreqpdusessrelease"
 	CUSTOM_PROCEDURE        string = "custom"
+	ANOMALY_PROFILE         string = "anomaly"
 )
 
 const PER_USER_TIMEOUT uint32 = 100 // seconds
@@ -88,6 +89,7 @@ type Profile struct {
 	Plmn           *models.PlmnId `yaml:"plmnId" json:"plmnId"`
 	SNssai         *models.Snssai `yaml:"sNssai" json:"sNssai"`
 	Log            *zap.SugaredLogger
+	Anomaly        string `yaml:"anomaly" json:"anomaly"`
 
 	// Profile routine reads messages from other entities on this channel
 	// Entities can be SimUe, Main routine.
@@ -193,6 +195,13 @@ func initProcedureEventMap() {
 		common.PROFILE_PASS_EVENT: common.QUIT_EVENT,
 	}
 	ProceduresMap[common.USER_DATA_PKT_GENERATION_PROCEDURE] = &proc9
+
+	// common.ANOMALY_PROCEDURE:
+	proc10 := ProcedureEventsDetails{}
+	proc10.Events = map[common.EventType]common.EventType{
+		common.PROFILE_PASS_EVENT: common.QUIT_EVENT,
+	}
+	ProceduresMap[common.ANOMALY_PROCEDURE] = &proc10
 }
 
 func (profile *Profile) Init() error {
@@ -272,6 +281,10 @@ func initProcedureList(profile *Profile) error {
 			common.PDU_SESSION_ESTABLISHMENT_PROCEDURE,
 			common.USER_DATA_PKT_GENERATION_PROCEDURE,
 			common.NW_REQUESTED_PDU_SESSION_RELEASE_PROCEDURE,
+		}
+	case ANOMALY_PROFILE:
+		profile.Procedures = []common.ProcedureType{
+			common.ANOMALY_PROCEDURE,
 		}
 
 	case CUSTOM_PROCEDURE:

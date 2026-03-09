@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2024 Canonical Ltd.
 # Copyright 2024 Intel Corporation
-
-name: Main workflow
+name: CI Pipeline
 
 on:
   pull_request:
@@ -12,98 +11,110 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Build
-        run: go build
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/build.yml@b5505f9f8923c31b4395b3268d28df9382389c21 # v0.0.18
+    with:
+      branch_name: ${{ github.ref }}
 
   docker-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/docker-build.yml@b5505f9f8923c31b4395b3268d28df9382389c21 # v0.0.18
+    with:
+      branch_name: ${{ github.ref }}
 
-      - name: Build Docker image
-        run: make docker-build
-
-  staticcheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: WillAbides/setup-go-faster@v1.14.0
-        with:
-          go-version-file: 'go.mod'
-
-      - uses: dominikh/staticcheck-action@v1.3.1
-        with:
-          version: latest
-          install-go: false
+  static-analysis:
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/static-analysis.yml@b5505f9f8923c31b4395b3268d28df9382389c21 # v0.0.18
+    with:
+      branch_name: ${{ github.ref }}
 
   lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6.1.1
-        with:
-          version: latest
-          args: -v --config ./.golangci.yml
+    permissions:
+      contents: read
+      checks: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/lint.yml@b5505f9f8923c31b4395b3268d28df9382389c21 # v0.0.18
+    with:
+      branch_name: ${{ github.ref }}
 
   hadolint:
-    name: hadolint
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Dockerfile linter
-        uses: hadolint/hadolint-action@v3.1.0
-        # For now, ignoring:
-        # DL3008 warning: Pin versions in apt get install (e.g., apt-get install <package>=<version>); and
-        # DL3018 warning: Pin versions in apk add (e.g., apk add <package>=<version>)
-        with:
-          dockerfile: Dockerfile
-          ignore: DL3008,DL3018
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/hadolint.yml@b5505f9f8923c31b4395b3268d28df9382389c21 # v0.0.18
+    with:
+      branch_name: ${{ github.ref }}
 
   license-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/license-check.yml@b5505f9f8923c31b4395b3268d28df9382389c21 # v0.0.18
+    with:
+      branch_name: ${{ github.ref }}
 
-      - name: reuse lint
-        uses: fsfe/reuse-action@v5
-
-  fossa-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: FOSSA scan
-        uses: fossa-contrib/fossa-action@v3
-        with:
-          fossa-api-key: 0c3bbcdf20e157bbd487dae173751b28
+  fossa-scan:
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/fossa-scan.yml@b5505f9f8923c31b4395b3268d28df9382389c21 # v0.0.18
+    with:
+      branch_name: ${{ github.ref }}
 
   unit-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    permissions:
+      contents: read
+      checks: write
+      id-token: write
+      attestations: write
+    uses: omec-project/.github/.github/workflows/unit-test.yml@b5505f9f8923c31b4395b3268d28df9382389c21 # v0.0.18
+    with:
+      branch_name: ${{ github.ref }}
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Unit tests
-        run: go test ./...
+  analysis:
+    if: github.repository_owner == 'omec-project'
+    permissions:
+      actions: read
+      artifact-metadata: read
+      attestations: read
+      checks: read
+      contents: read
+      deployments: read
+      discussions: read
+      id-token: write
+      issues: read
+      models: read
+      packages: read
+      pages: read
+      pull-requests: read
+      repository-projects: read
+      security-events: write
+      statuses: read
+    uses: omec-project/.github/.github/workflows/scorecard-analysis.yml@b5505f9f8923c31b4395b3268d28df9382389c21 # v0.0.18
+    with:
+      branch_name: ${{ github.ref }}

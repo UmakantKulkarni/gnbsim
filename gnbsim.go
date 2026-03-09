@@ -7,6 +7,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof" // Using package only for invoking initialization.
@@ -25,12 +26,12 @@ import (
 	prof "github.com/omec-project/gnbsim/profile"
 	profctx "github.com/omec-project/gnbsim/profile/context"
 	"github.com/omec-project/gnbsim/stats"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"go.uber.org/zap/zapcore"
 )
 
 func main() {
-	app := cli.NewApp()
+	app := &cli.Command{}
 	app.Name = "GNBSIM"
 	app.Usage = "gnbsim --cfg <gnbsim_config_file.yaml>"
 	app.Action = action
@@ -38,13 +39,13 @@ func main() {
 
 	logger.AppLog.Infoln("app name:", app.Name)
 
-	if err := app.Run(os.Args); err != nil {
+	if err := app.Run(context.Background(), os.Args); err != nil {
 		logger.AppLog.Errorln("failed to run GNBSIM:", err)
 		return
 	}
 }
 
-func action(c *cli.Context) error {
+func action(ctx context.Context, c *cli.Command) error {
 	cfg := c.String("cfg")
 
 	absPath, err := filepath.Abs(cfg)
@@ -123,7 +124,7 @@ func action(c *cli.Context) error {
 		// Keep running gnbsim as long as profiles are not finished
 		for _, profile := range config.Configuration.Profiles {
 			if !profile.Enable {
-				logger.AppLog.Errorln("disabled profileType ", profile.ProfileType)
+				logger.AppLog.Warnf("disabled profile %s [type: %s]", profile.Name, profile.ProfileType)
 				continue
 			}
 			profileWaitGrp.Add(1)

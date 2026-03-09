@@ -5,13 +5,14 @@
 package transport
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"syscall"
 	"time"
 
-	"git.cs.nctu.edu.tw/calee/sctp"
+	"github.com/ishidawataru/sctp"
 	gnbctx "github.com/omec-project/gnbsim/gnodeb/context"
 	"github.com/omec-project/gnbsim/gnodeb/worker/gnbamfworker"
 	"github.com/omec-project/gnbsim/logger"
@@ -53,7 +54,7 @@ func (cpTprt *GnbCpTransport) ConnectToPeer(peer transportcommon.TransportPeer) 
 			return fmt.Errorf("amf ip or host name not configured")
 		}
 		var addrs []string
-		addrs, err = net.LookupHost(amf.AmfHostName)
+		addrs, err = net.DefaultResolver.LookupHost(context.Background(), amf.AmfHostName)
 		if err != nil {
 			return fmt.Errorf("failed to resolve amf host name: %v, err: %v",
 				amf.AmfHostName, err)
@@ -89,7 +90,7 @@ func (cpTprt *GnbCpTransport) SendToPeerBlock(peer transportcommon.TransportPeer
 	recvMsg := make([]byte, MAX_SCTP_PKT_LEN)
 	conn := amf.Conn.(*sctp.SCTPConn)
 
-	n, _, _, err := conn.SCTPRead(recvMsg)
+	n, _, err := conn.SCTPRead(recvMsg)
 	if err != nil {
 		cpTprt.Log.Errorln("SCTPRead returned :", err)
 		return nil, fmt.Errorf("failed to read from socket")
@@ -147,7 +148,7 @@ func (cpTprt *GnbCpTransport) ReceiveFromPeer(peer transportcommon.TransportPeer
 	for {
 		recvMsg := make([]byte, MAX_SCTP_PKT_LEN)
 		// TODO Handle notification, info
-		n, _, _, err := conn.SCTPRead(recvMsg)
+		n, _, err := conn.SCTPRead(recvMsg)
 		if err != nil {
 			switch err {
 			case io.EOF, io.ErrUnexpectedEOF:

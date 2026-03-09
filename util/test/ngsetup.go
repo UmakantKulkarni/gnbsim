@@ -6,13 +6,13 @@ package test
 
 import (
 	"fmt"
+	"math/bits"
 	"net"
 
-	"git.cs.nctu.edu.tw/calee/sctp"
-	"github.com/calee0219/fatal"
+	"github.com/ishidawataru/sctp"
+	"github.com/omec-project/gnbsim/logger"
+	"github.com/omec-project/ngap"
 )
-
-const NgapPPID uint32 = 0x3c000000
 
 func getNgapIp(amfIP, ranIP string, amfPort, ranPort int) (amfAddr, ranAddr *sctp.SCTPAddr, err error) {
 	ips := []net.IPAddr{}
@@ -51,9 +51,12 @@ func ConnectToAmf(amfIP, ranIP string, amfPort, ranPort int) (*sctp.SCTPConn, er
 	}
 	info, err := conn.GetDefaultSentParam()
 	if err != nil {
-		fatal.Fatalf("conn GetDefaultSentParam error in ConnectToAmf: %+v", err)
+		logger.UtilLog.Fatalf("conn GetDefaultSentParam error in ConnectToAmf: %+v", err)
 	}
-	info.PPID = NgapPPID
+	// The previous SCTP library expected PPID in network byte order (big-endian),
+	// while the new library expects host byte order. Using bits.ReverseBytes32
+	// ensures the PPID is interpreted correctly by the new SCTP implementation.
+	info.PPID = bits.ReverseBytes32(ngap.PPID)
 	err = conn.SetDefaultSentParam(info)
 	if err != nil {
 		return nil, err
